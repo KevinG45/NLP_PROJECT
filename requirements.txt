@@ -1,0 +1,15 @@
+# Core ML and NLP dependencies
+torch>=1.9.0
+transformers>=4.20.0
+datasets>=2.0.0
+scikit-learn>=1.0.0
+numpy>=1.21.0
+pandas>=1.3.0
+
+# Web scraping and text processing
+requests>=2.25.0
+beautifulsoup4>=4.9.0
+PyPDF2>=3.0.0
+
+# Streamlit for web interface
+streamlit>=1.20.0

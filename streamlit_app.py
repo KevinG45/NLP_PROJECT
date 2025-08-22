@@ -16,6 +16,39 @@ import re
 import warnings
 warnings.filterwarnings('ignore')
 
+# Import the SimpleSummarizer class from train_model
+try:
+    from train_model import SimpleSummarizer
+except ImportError:
+    # Fallback definition if import fails
+    class SimpleSummarizer:
+        def __init__(self):
+            self.keywords = ['data', 'information', 'collect', 'share', 'privacy', 'policy', 'personal']
+        
+        def __call__(self, text, max_length=150, min_length=50):
+            sentences = text.split('.')
+            sentences = [s.strip() for s in sentences if len(s.strip()) > 20]
+            
+            if len(sentences) <= 3:
+                return text[:max_length] + "..." if len(text) > max_length else text
+            
+            scored_sentences = []
+            for sentence in sentences[:10]:
+                score = len(sentence)
+                for keyword in self.keywords:
+                    if keyword.lower() in sentence.lower():
+                        score += 50
+                scored_sentences.append((score, sentence))
+            
+            scored_sentences.sort(reverse=True)
+            selected_sentences = [sent[1] for sent in scored_sentences[:3]]
+            
+            summary = '. '.join(selected_sentences)
+            if len(summary) > max_length:
+                summary = summary[:max_length] + "..."
+            
+            return summary
+
 # Page configuration
 st.set_page_config(
     page_title="Privacy Policy Analyzer",
@@ -97,11 +130,30 @@ def load_model():
             model_package = pickle.load(f)
         return model_package
     except FileNotFoundError:
-        st.error("Model file 'privacy_model.pkl' not found. Please run 'train_model.py' first!")
         return None
     except Exception as e:
         st.error(f"Error loading model: {str(e)}")
         return None
+
+def display_model_setup_instructions():
+    """Display instructions for setting up the model"""
+    st.error("🚨 Model not found!")
+    
+    st.markdown("""
+    <div class="card alert-card">
+        <h4>📝 Setup Required</h4>
+        <p>The privacy policy analysis model hasn't been trained yet. Please follow these steps:</p>
+        <ol>
+            <li><strong>Install dependencies:</strong> <code>pip install -r requirements.txt</code></li>
+            <li><strong>Train the model:</strong> <code>python train_model.py</code></li>
+            <li><strong>Start the app:</strong> <code>streamlit run streamlit_app.py</code></li>
+        </ol>
+        <p><strong>Note:</strong> The training script will automatically use synthetic data if the OPP-115 dataset is not available.</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    if st.button("🔄 Check for Model Again"):
+        st.rerun()
 
 def extract_text_from_url(url):
     """Extract text content from a privacy policy URL"""
@@ -161,46 +213,75 @@ def preprocess_text(text, max_length=512):
 def classify_privacy_policy(text, model_package):
     """Classify privacy policy text using the trained model"""
     try:
-        classifier = model_package['classifier']
-        model = classifier['model']
-        tokenizer = classifier['tokenizer']
-        label_names = classifier['label_names']
+        classifier_data = model_package['classifier']
         
-        # Force model to CPU for inference
-        model = model.to('cpu')
-        model.eval()
-        
-        # Preprocess text
-        processed_text = preprocess_text(text)
-        
-        # Tokenize - don't return tensors initially
-        inputs = tokenizer(
-            processed_text, 
-            truncation=True, 
-            padding=True, 
-            max_length=256,
-            return_tensors="pt"
-        )
-        
-        # Move inputs to CPU
-        inputs = {k: v.to('cpu') for k, v in inputs.items()}
-        
-        # Predict
-        with torch.no_grad():
-            outputs = model(**inputs)
-            predictions = torch.sigmoid(outputs.logits)
-        
-        # Convert to probabilities and create results
-        probs = predictions.cpu().numpy()[0]
-        results = {}
-        
-        for i, label in enumerate(label_names):
-            results[label] = {
-                'probability': float(probs[i]),
-                'predicted': probs[i] > 0.5
-            }
-        
-        return results
+        # Check if this is the new sklearn model or old transformer model
+        if 'model_type' in classifier_data and classifier_data['model_type'] == 'sklearn_tfidf':
+            # New sklearn-based model
+            pipeline = classifier_data['pipeline']
+            label_names = classifier_data['label_names']
+            
+            # Preprocess text
+            processed_text = preprocess_text(text)
+            
+            # Predict probabilities
+            probabilities = pipeline.predict_proba([processed_text])
+            predictions = pipeline.predict([processed_text])[0]
+            
+            # Convert to results format
+            results = {}
+            for i, label in enumerate(label_names):
+                # For sklearn, we get probability for class 1 (positive class)
+                prob = probabilities[i][0][1] if len(probabilities[i][0]) > 1 else 0.5
+                results[label] = {
+                    'probability': float(prob),
+                    'predicted': bool(predictions[i])
+                }
+            
+            return results
+            
+        else:
+            # Original transformer model (fallback)
+            model = classifier_data['model']
+            tokenizer = classifier_data['tokenizer']
+            label_names = classifier_data['label_names']
+            
+            # Force model to CPU for inference
+            model = model.to('cpu')
+            model.eval()
+            
+            # Preprocess text
+            processed_text = preprocess_text(text)
+            
+            # Tokenize
+            inputs = tokenizer(
+                processed_text, 
+                truncation=True, 
+                padding=True, 
+                max_length=256,
+                return_tensors="pt"
+            )
+            
+            # Move inputs to CPU
+            inputs = {k: v.to('cpu') for k, v in inputs.items()}
+            
+            # Predict
+            with torch.no_grad():
+                outputs = model(**inputs)
+                predictions = torch.sigmoid(outputs.logits)
+            
+            # Convert to probabilities and create results
+            probs = predictions.cpu().numpy()[0]
+            results = {}
+            
+            for i, label in enumerate(label_names):
+                results[label] = {
+                    'probability': float(probs[i]),
+                    'predicted': probs[i] > 0.5
+                }
+            
+            return results
+            
     except Exception as e:
         st.error(f"Error in classification: {str(e)}")
         return None
@@ -210,20 +291,27 @@ def summarize_text(text, model_package):
     try:
         summarizer = model_package['summarizer']
         
-        # Limit text length for summarization
-        words = text.split()
-        if len(words) > 1024:
-            text = ' '.join(words[:1024])
-        
-        # Generate summary - force CPU usage
-        summary = summarizer(
-            text, 
-            max_length=150, 
-            min_length=50, 
-            do_sample=False,
-            device=-1  # Force CPU
-        )
-        return summary[0]['summary_text']
+        # Check if this is a function (simple summarizer) or pipeline (transformer)
+        if callable(summarizer):
+            # Simple extractive summarizer
+            return summarizer(text)
+        else:
+            # Original transformer summarizer
+            # Limit text length for summarization
+            words = text.split()
+            if len(words) > 1024:
+                text = ' '.join(words[:1024])
+            
+            # Generate summary - force CPU usage
+            summary = summarizer(
+                text, 
+                max_length=150, 
+                min_length=50, 
+                do_sample=False,
+                device=-1  # Force CPU
+            )
+            return summary[0]['summary_text']
+            
     except Exception as e:
         st.error(f"Error in summarization: {str(e)}")
         return "Unable to generate summary."
@@ -365,6 +453,7 @@ def main():
     # Load model
     model_package = load_model()
     if model_package is None:
+        display_model_setup_instructions()
         st.stop()
     
     st.sidebar.success("✅ Model loaded successfully!")
