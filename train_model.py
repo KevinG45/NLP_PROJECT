@@ -27,6 +27,40 @@ from sklearn.preprocessing import LabelEncoder
 import datasets
 from datasets import Dataset
 
+class SimpleSummarizer:
+    """Simple extractive summarization class"""
+    
+    def __init__(self):
+        self.keywords = ['data', 'information', 'collect', 'share', 'privacy', 'policy', 'personal']
+    
+    def __call__(self, text, max_length=150, min_length=50):
+        """Simple extractive summarization"""
+        sentences = text.split('.')
+        sentences = [s.strip() for s in sentences if len(s.strip()) > 20]
+        
+        if len(sentences) <= 3:
+            return text[:max_length] + "..." if len(text) > max_length else text
+        
+        # Score sentences by length and keyword presence
+        scored_sentences = []
+        
+        for sentence in sentences[:10]:  # Limit to first 10 sentences
+            score = len(sentence)  # Prefer longer sentences
+            for keyword in self.keywords:
+                if keyword.lower() in sentence.lower():
+                    score += 50
+            scored_sentences.append((score, sentence))
+        
+        # Sort by score and take top sentences
+        scored_sentences.sort(reverse=True)
+        selected_sentences = [sent[1] for sent in scored_sentences[:3]]
+        
+        summary = '. '.join(selected_sentences)
+        if len(summary) > max_length:
+            summary = summary[:max_length] + "..."
+        
+        return summary
+
 def download_opp115_dataset():
     """Download and extract the OPP-115 dataset"""
     print("Downloading OPP-115 dataset...")
@@ -189,6 +223,120 @@ def load_annotations_data():
     print(f"Loaded annotations for {len(annotations)} files")
     return annotations
 
+def generate_synthetic_privacy_data():
+    """Generate synthetic privacy policy data for training when real data is unavailable"""
+    print("Generating synthetic privacy policy data...")
+    
+    # Sample privacy policy text segments with different characteristics
+    synthetic_data = [
+        # Data collection examples
+        {
+            'text': "We collect personal information including your name, email address, phone number, and location data when you use our services to provide you with a personalized experience.",
+            'labels': {'data_collection': 1, 'data_sharing': 0, 'data_storage': 0, 'vague_language': 0}
+        },
+        {
+            'text': "Our application automatically gathers device information, usage statistics, and browsing behavior to improve our service quality and user experience.",
+            'labels': {'data_collection': 1, 'data_sharing': 0, 'data_storage': 0, 'vague_language': 1}
+        },
+        {
+            'text': "We obtain information about your preferences, interests, and demographic data through surveys and interaction with our platform.",
+            'labels': {'data_collection': 1, 'data_sharing': 0, 'data_storage': 0, 'vague_language': 0}
+        },
+        
+        # Data sharing examples
+        {
+            'text': "We may share your personal information with third-party partners, affiliates, and service providers for business purposes and marketing activities.",
+            'labels': {'data_collection': 0, 'data_sharing': 1, 'data_storage': 0, 'vague_language': 1}
+        },
+        {
+            'text': "Your data will be disclosed to law enforcement agencies when required by law or to protect our legitimate business interests.",
+            'labels': {'data_collection': 0, 'data_sharing': 1, 'data_storage': 0, 'vague_language': 1}
+        },
+        {
+            'text': "We transfer information to our trusted partners and subsidiaries who help us operate our business and provide services to you.",
+            'labels': {'data_collection': 0, 'data_sharing': 1, 'data_storage': 0, 'vague_language': 0}
+        },
+        
+        # Data storage examples
+        {
+            'text': "We store your personal data on secure servers with encryption and implement appropriate technical safeguards to protect your information.",
+            'labels': {'data_collection': 0, 'data_sharing': 0, 'data_storage': 1, 'vague_language': 0}
+        },
+        {
+            'text': "Your information is retained for as long as necessary to fulfill the purposes outlined in this privacy policy and to comply with legal obligations.",
+            'labels': {'data_collection': 0, 'data_sharing': 0, 'data_storage': 1, 'vague_language': 1}
+        },
+        {
+            'text': "We maintain data security through industry-standard encryption, access controls, and regular security audits of our storage systems.",
+            'labels': {'data_collection': 0, 'data_sharing': 0, 'data_storage': 1, 'vague_language': 0}
+        },
+        
+        # Vague language examples
+        {
+            'text': "We may use your information for other purposes as we deem necessary or appropriate to enhance user experience and improve our services.",
+            'labels': {'data_collection': 0, 'data_sharing': 0, 'data_storage': 0, 'vague_language': 1}
+        },
+        {
+            'text': "From time to time, we might update our practices and procedures in our sole discretion to better serve our legitimate business interests.",
+            'labels': {'data_collection': 0, 'data_sharing': 0, 'data_storage': 0, 'vague_language': 1}
+        },
+        {
+            'text': "We reserve the right to modify these terms as needed for business purposes and regulatory compliance requirements.",
+            'labels': {'data_collection': 0, 'data_sharing': 0, 'data_storage': 0, 'vague_language': 1}
+        },
+        
+        # Clear, neutral examples
+        {
+            'text': "This privacy policy explains how we handle information and describes our commitment to protecting user privacy.",
+            'labels': {'data_collection': 0, 'data_sharing': 0, 'data_storage': 0, 'vague_language': 0}
+        },
+        {
+            'text': "You can contact our privacy team at privacy@company.com if you have questions about this policy or your rights.",
+            'labels': {'data_collection': 0, 'data_sharing': 0, 'data_storage': 0, 'vague_language': 0}
+        },
+        {
+            'text': "This document was last updated on January 1, 2024 and becomes effective immediately upon posting.",
+            'labels': {'data_collection': 0, 'data_sharing': 0, 'data_storage': 0, 'vague_language': 0}
+        },
+    ]
+    
+    # Expand the dataset by creating variations
+    expanded_data = []
+    for item in synthetic_data:
+        expanded_data.append(item)
+        
+        # Create variations with slight modifications
+        for i in range(3):
+            variation = item.copy()
+            # Add some noise to text while preserving meaning
+            text = variation['text']
+            
+            # Simple variations
+            if 'information' in text:
+                text = text.replace('information', 'data' if i == 0 else 'details' if i == 1 else 'information')
+            if 'we' in text.lower():
+                text = text.replace('We ', 'Our company ' if i == 0 else 'This organization ' if i == 1 else 'We ')
+            
+            variation['text'] = text
+            expanded_data.append(variation)
+    
+    # Convert to DataFrame format
+    texts = [item['text'] for item in expanded_data]
+    df_data = {'text': texts}
+    
+    for label in ['data_collection', 'data_sharing', 'data_storage', 'vague_language']:
+        df_data[label] = [item['labels'][label] for item in expanded_data]
+    
+    df = pd.DataFrame(df_data)
+    print(f"Generated {len(df)} synthetic training samples")
+    
+    # Print label distribution
+    for label in ['data_collection', 'data_sharing', 'data_storage', 'vague_language']:
+        count = df[label].sum()
+        print(f"{label}: {count} positive samples ({count/len(df)*100:.1f}%)")
+    
+    return df
+
 def create_labels_from_text(text):
     """Create labels based on text content analysis"""
     text_lower = text.lower()
@@ -268,159 +416,83 @@ def create_multi_label_classifier(df):
     for i, col in enumerate(['data_collection', 'data_sharing', 'data_storage', 'vague_language']):
         print(f"  {col}: {np.sum(labels[:, i])} positive samples")
     
-    # Ensure we have some positive samples for each class
-    for i in range(labels.shape[1]):
-        if np.sum(labels[:, i]) == 0:
-            # Add at least one positive sample for each class to avoid training issues
-            labels[i, i] = 1.0
+    # Use TF-IDF Vectorizer for text features (offline-friendly approach)
+    from sklearn.feature_extraction.text import TfidfVectorizer
+    from sklearn.multioutput import MultiOutputClassifier
+    from sklearn.linear_model import LogisticRegression
+    from sklearn.pipeline import Pipeline
     
-    # Split data - use simple split if stratification fails
+    # Create text processing pipeline
+    print("Using TF-IDF + Logistic Regression approach (offline-friendly)")
+    
+    # Split data
     try:
         X_train, X_test, y_train, y_test = train_test_split(
-            texts, labels, test_size=0.2, random_state=42, stratify=labels
+            texts, labels, test_size=0.2, random_state=42
         )
     except ValueError:
-        # If stratification fails, use simple split
-        print("Stratification failed, using simple split")
+        print("Using simple split")
         X_train, X_test, y_train, y_test = train_test_split(
             texts, labels, test_size=0.2, random_state=42
         )
     
     print(f"Training samples: {len(X_train)}, Test samples: {len(X_test)}")
     
-    # Use GPU if available
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    print(f"Using device: {device}")
-    
-    # Initialize tokenizer and model
-    model_name = "distilbert-base-uncased"
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
-    
-    # Add padding token if it doesn't exist
-    if tokenizer.pad_token is None:
-        tokenizer.pad_token = tokenizer.eos_token
-    
-    # Tokenize data with consistent parameters - KEY FIX: Don't return tensors here
-    max_length = 256
-    train_encodings = tokenizer(
-        X_train, 
-        truncation=True, 
-        padding=True, 
-        max_length=max_length
-    )
-    test_encodings = tokenizer(
-        X_test, 
-        truncation=True, 
-        padding=True, 
-        max_length=max_length
+    # Create TF-IDF vectorizer
+    vectorizer = TfidfVectorizer(
+        max_features=5000,
+        stop_words='english',
+        ngram_range=(1, 2),
+        min_df=1,
+        max_df=0.95
     )
     
-    # Create custom dataset class - FIXED tensor handling
-    class PrivacyDataset(torch.utils.data.Dataset):
-        def __init__(self, encodings, labels):
-            self.encodings = encodings
-            self.labels = torch.tensor(labels, dtype=torch.float32)
-        
-        def __getitem__(self, idx):
-            # Convert to tensors only when accessing individual items
-            item = {}
-            for key, val in self.encodings.items():
-                item[key] = torch.tensor(val[idx], dtype=torch.long)
-            item['labels'] = self.labels[idx]
-            return item
-        
-        def __len__(self):
-            return len(self.labels)
-    
-    train_dataset = PrivacyDataset(train_encodings, y_train)
-    test_dataset = PrivacyDataset(test_encodings, y_test)
-    
-    # Load model for multi-label classification
-    model = AutoModelForSequenceClassification.from_pretrained(
-        model_name, 
-        num_labels=4,  # 4 categories
-        problem_type="multi_label_classification"
+    # Create multi-output classifier
+    classifier = MultiOutputClassifier(
+        LogisticRegression(random_state=42, max_iter=1000)
     )
     
-    # Resize token embeddings if we added a pad token
-    model.resize_token_embeddings(len(tokenizer))
+    # Create pipeline
+    pipeline = Pipeline([
+        ('tfidf', vectorizer),
+        ('classifier', classifier)
+    ])
     
-    # Training arguments - GPU optimized
-    training_args = TrainingArguments(
-        output_dir='./results',
-        num_train_epochs=3,
-        per_device_train_batch_size=8,  # Start smaller to avoid OOM
-        per_device_eval_batch_size=8,
-        gradient_accumulation_steps=2,  # Effectively batch size of 16
-        warmup_steps=100,
-        weight_decay=0.01,
-        logging_dir='./logs',
-        logging_steps=50,
-        eval_strategy="epoch",
-        save_strategy="epoch",
-        load_best_model_at_end=True,
-        metric_for_best_model="eval_loss",
-        greater_is_better=False,
-        fp16=torch.cuda.is_available(),  # Use mixed precision if GPU available
-        dataloader_pin_memory=True,
-        remove_unused_columns=False,  # Important for custom datasets
-    )
-    
-    # Create trainer
-    trainer = Trainer(
-        model=model,
-        args=training_args,
-        train_dataset=train_dataset,
-        eval_dataset=test_dataset,
-    )
-    
-    # Train model
-    print(f"Training model on {device}...")
-    try:
-        trainer.train()
-    except RuntimeError as e:
-        if "CUDA" in str(e):
-            print(f"CUDA error occurred: {e}")
-            print("Falling back to CPU training...")
-            # Move model to CPU and retry
-            model = model.to('cpu')
-            training_args.no_cuda = True
-            training_args.fp16 = False
-            trainer = Trainer(
-                model=model,
-                args=training_args,
-                train_dataset=train_dataset,
-                eval_dataset=test_dataset,
-            )
-            trainer.train()
-        else:
-            raise e
+    # Train the model
+    print("Training TF-IDF + Logistic Regression model...")
+    pipeline.fit(X_train, y_train)
     
     # Evaluate model
     print("Evaluating model...")
-    eval_results = trainer.evaluate()
-    print(f"Evaluation results: {eval_results}")
+    train_score = pipeline.score(X_train, y_train)
+    test_score = pipeline.score(X_test, y_test)
+    print(f"Training accuracy: {train_score:.3f}")
+    print(f"Test accuracy: {test_score:.3f}")
     
-    # Save model components
+    # Create predictions for detailed evaluation
+    y_pred = pipeline.predict(X_test)
+    
+    # Print classification report for each label
+    label_names = ['data_collection', 'data_sharing', 'data_storage', 'vague_language']
+    for i, label_name in enumerate(label_names):
+        print(f"\n{label_name}:")
+        print(classification_report(y_test[:, i], y_pred[:, i], zero_division=0))
+    
+    # Save model components - lightweight version
     model_data = {
-        'model': model,
-        'tokenizer': tokenizer,
-        'label_names': ['data_collection', 'data_sharing', 'data_storage', 'vague_language']
+        'pipeline': pipeline,
+        'vectorizer': vectorizer,
+        'classifier': classifier,
+        'label_names': label_names,
+        'model_type': 'sklearn_tfidf'
     }
     
     return model_data
 
 def create_summarization_pipeline():
-    """Create a summarization pipeline"""
-    print("Creating summarization pipeline...")
-    
-    summarizer = pipeline(
-        "summarization",
-        model="facebook/bart-large-cnn",
-        device=0 if torch.cuda.is_available() else -1
-    )
-    
-    return summarizer
+    """Create a simple extractive summarization function"""
+    print("Creating simple extractive summarization...")
+    return SimpleSummarizer()
 
 def save_model(model_data, summarizer):
     """Save the trained model and components"""
@@ -450,8 +522,7 @@ def main():
     if not os.path.exists("data/OPP-115"):
         download_success = download_opp115_dataset()
         if not download_success:
-            print("Failed to download dataset. Exiting...")
-            return
+            print("Failed to download dataset. Will use synthetic data instead...")
     else:
         print("Dataset directory already exists, skipping download.")
     
@@ -459,8 +530,12 @@ def main():
     df = load_real_opp115_data()
     
     if df is None or len(df) == 0:
-        print("Failed to load real OPP-115 data. Exiting...")
-        return
+        print("Failed to load real OPP-115 data. Using synthetic data instead...")
+        df = generate_synthetic_privacy_data()
+        
+        if df is None or len(df) == 0:
+            print("Failed to generate synthetic data. Exiting...")
+            return
     
     # Create and train classifier
     model_data = create_multi_label_classifier(df)
@@ -473,7 +548,7 @@ def main():
     
     print("Training completed successfully!")
     print("Model saved as 'privacy_model.pkl'")
-    print("You can now run the Streamlit app with: streamlit run app.py")
+    print("You can now run the Streamlit app with: streamlit run streamlit_app.py")
 
 if __name__ == "__main__":
     main()
