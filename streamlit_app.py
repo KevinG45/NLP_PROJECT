@@ -14,7 +14,16 @@ import PyPDF2
 from io import BytesIO
 import re
 import warnings
+import pandas as pd
+from collections import Counter
 warnings.filterwarnings('ignore')
+
+# Import our enhanced NLP concepts module
+try:
+    from nlp_concepts import NLPAnalyzer
+except ImportError:
+    st.error("NLP Concepts module not found. Please ensure nlp_concepts.py is in the same directory.")
+    NLPAnalyzer = None
 
 # Import the SimpleSummarizer class from train_model
 try:
@@ -424,6 +433,492 @@ def display_vague_language_analysis(vague_indicators):
         </div>
         """, unsafe_allow_html=True)
 
+def display_nlp_concepts_demo():
+    """Display comprehensive NLP concepts demonstration"""
+    st.markdown('<h1 class="main-header">🧠 NLP Concepts Demonstration</h1>', unsafe_allow_html=True)
+    
+    if NLPAnalyzer is None:
+        st.error("NLP Analyzer not available. Please check the nlp_concepts.py file.")
+        return
+    
+    analyzer = NLPAnalyzer()
+    
+    # Sidebar for concept selection
+    st.sidebar.markdown("### Select NLP Concepts to Explore")
+    concepts = {
+        "🔤 Tokenization": "tokenization",
+        "🏷️ Part-of-Speech Tagging": "pos_tagging",
+        "🏛️ Named Entity Recognition": "ner",
+        "😊 Sentiment Analysis": "sentiment",
+        "📊 Text Statistics": "statistics",
+        "🔑 Keyword Extraction": "keywords",
+        "📈 N-gram Analysis": "ngrams",
+        "🎯 Topic Modeling": "topics",
+        "🔍 Privacy Pattern Analysis": "privacy_patterns",
+        "🎓 Language Complexity": "complexity"
+    }
+    
+    selected_concepts = []
+    for display_name, concept_id in concepts.items():
+        if st.sidebar.checkbox(display_name, value=(concept_id in ["tokenization", "statistics", "keywords"])):
+            selected_concepts.append(concept_id)
+    
+    # Text input section
+    st.subheader("📝 Enter Text for Analysis")
+    demo_text = """
+    We collect personal information including your name, email address, and location data when you use our services. 
+    This information may be shared with third-party partners for business purposes. We store your data securely 
+    using industry-standard encryption. You have the right to opt-out of data sharing at any time by contacting 
+    our privacy team at privacy@company.com. We reserve the right to update this policy as needed for compliance purposes.
+    """
+    
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        text_input = st.text_area(
+            "Enter text to analyze:",
+            value=demo_text,
+            height=150,
+            help="Enter any text to see various NLP concepts in action"
+        )
+    
+    with col2:
+        st.markdown("**Sample Texts:**")
+        if st.button("🔐 Privacy Policy Sample"):
+            st.experimental_rerun()
+        if st.button("📰 News Article Sample"):
+            text_input = """
+            The new artificial intelligence system demonstrates remarkable capabilities in natural language processing. 
+            Researchers at the university have developed algorithms that can understand context and generate human-like responses. 
+            This breakthrough could revolutionize how we interact with technology in the future.
+            """
+        if st.button("📧 Email Sample"):
+            text_input = """
+            Dear valued customer, we are writing to inform you about important updates to our service. 
+            These changes will improve your experience and provide better security features. 
+            Please review the attached documentation for more details.
+            """
+    
+    if not text_input.strip():
+        st.warning("Please enter some text to analyze.")
+        return
+    
+    # Display analysis results
+    st.markdown("---")
+    
+    # Tokenization
+    if "tokenization" in selected_concepts:
+        st.subheader("🔤 Tokenization Analysis")
+        with st.expander("What is Tokenization?", expanded=False):
+            st.markdown("""
+            **Tokenization** is the process of breaking down text into smaller units (tokens) such as words, sentences, or characters.
+            It's the foundation of most NLP tasks.
+            """)
+        
+        tokens = analyzer.basic_tokenization(text_input)
+        
+        col1, col2, col3, col4 = st.columns(4)
+        col1.metric("Words", tokens['word_count'])
+        col2.metric("Sentences", tokens['sentence_count'])
+        col3.metric("Characters", tokens['char_count'])
+        col4.metric("Paragraphs", tokens['paragraph_count'])
+        
+        with st.expander("View Tokenization Details"):
+            st.write("**First 20 Word Tokens:**")
+            st.write(tokens['word_tokens'][:20])
+            st.write("**Sentences:**")
+            for i, sent in enumerate(tokens['sentences'][:5], 1):
+                st.write(f"{i}. {sent}")
+    
+    # Part-of-Speech Tagging
+    if "pos_tagging" in selected_concepts:
+        st.subheader("🏷️ Part-of-Speech (POS) Tagging")
+        with st.expander("What is POS Tagging?", expanded=False):
+            st.markdown("""
+            **POS Tagging** assigns grammatical categories (noun, verb, adjective, etc.) to each word in the text.
+            This helps understand the grammatical structure and meaning.
+            """)
+        
+        pos_tags = analyzer.pos_tagging_simple(text_input)
+        
+        # Create POS distribution
+        pos_counts = Counter([tag for _, tag in pos_tags])
+        pos_df = pd.DataFrame(list(pos_counts.items()), columns=['POS Tag', 'Count'])
+        
+        col1, col2 = st.columns([1, 1])
+        
+        with col1:
+            st.bar_chart(pos_df.set_index('POS Tag'))
+        
+        with col2:
+            st.write("**Sample Tagged Words:**")
+            for word, tag in pos_tags[:15]:
+                color = {
+                    'NOUN': '🔵', 'VERB': '🟢', 'ADJ': '🟡',
+                    'MODAL': '🟠', 'PREP': '🟣'
+                }.get(tag, '⚪')
+                st.write(f"{color} **{word}** ({tag})")
+    
+    # Named Entity Recognition
+    if "ner" in selected_concepts:
+        st.subheader("🏛️ Named Entity Recognition (NER)")
+        with st.expander("What is NER?", expanded=False):
+            st.markdown("""
+            **Named Entity Recognition** identifies and classifies named entities (people, organizations, locations, etc.) in text.
+            This is crucial for information extraction and understanding.
+            """)
+        
+        entities = analyzer.named_entity_recognition(text_input)
+        
+        has_entities = any(entities.values())
+        if has_entities:
+            for entity_type, entity_list in entities.items():
+                if entity_list:
+                    st.write(f"**{entity_type.replace('_', ' ').title()}:**")
+                    for entity in entity_list[:5]:  # Show first 5
+                        st.write(f"• {entity}")
+        else:
+            st.info("No entities detected in this text.")
+    
+    # Sentiment Analysis
+    if "sentiment" in selected_concepts:
+        st.subheader("😊 Sentiment Analysis")
+        with st.expander("What is Sentiment Analysis?", expanded=False):
+            st.markdown("""
+            **Sentiment Analysis** determines the emotional tone of text (positive, negative, or neutral).
+            For privacy policies, this can indicate user-friendliness.
+            """)
+        
+        sentiment = analyzer.sentiment_analysis_simple(text_input)
+        
+        col1, col2, col3 = st.columns(3)
+        
+        sentiment_colors = {
+            'positive': '🟢',
+            'negative': '🔴',
+            'neutral': '🟡'
+        }
+        
+        col1.metric(
+            f"{sentiment_colors[sentiment['sentiment']]} Sentiment",
+            sentiment['sentiment'].title()
+        )
+        col2.metric("Positive Words", sentiment['positive'])
+        col3.metric("Negative Words", sentiment['negative'])
+        
+        # Sentiment score visualization
+        score = sentiment['score']
+        if score > 0:
+            st.success(f"Sentiment Score: +{score:.3f} (Positive bias)")
+        elif score < 0:
+            st.error(f"Sentiment Score: {score:.3f} (Negative bias)")
+        else:
+            st.info(f"Sentiment Score: {score:.3f} (Neutral)")
+    
+    # Text Statistics
+    if "statistics" in selected_concepts:
+        st.subheader("📊 Comprehensive Text Statistics")
+        with st.expander("What are Text Statistics?", expanded=False):
+            st.markdown("""
+            **Text Statistics** provide quantitative measures of text complexity, readability, and structure.
+            These metrics help assess document quality and accessibility.
+            """)
+        
+        stats = analyzer.text_statistics(text_input)
+        
+        col1, col2, col3 = st.columns(3)
+        
+        col1.metric("Lexical Diversity", f"{stats['lexical_diversity']:.3f}")
+        col2.metric("Avg Words/Sentence", f"{stats['avg_words_per_sentence']:.1f}")
+        col3.metric("Avg Chars/Word", f"{stats['avg_chars_per_word']:.1f}")
+        
+        # Readability score
+        flesch_score = stats['flesch_reading_ease']
+        if flesch_score >= 90:
+            readability = "Very Easy 😊"
+            color = "success"
+        elif flesch_score >= 80:
+            readability = "Easy 🙂"
+            color = "success"
+        elif flesch_score >= 70:
+            readability = "Fairly Easy 😐"
+            color = "info"
+        elif flesch_score >= 60:
+            readability = "Standard 😕"
+            color = "warning"
+        elif flesch_score >= 50:
+            readability = "Fairly Difficult 😟"
+            color = "warning"
+        else:
+            readability = "Difficult 😰"
+            color = "error"
+        
+        st.markdown(f"""
+        <div class="card {color}-card">
+            <h4>📖 Readability Score</h4>
+            <p><strong>Flesch Reading Ease:</strong> {flesch_score:.1f}</p>
+            <p><strong>Level:</strong> {readability}</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # Keyword Extraction
+    if "keywords" in selected_concepts:
+        st.subheader("🔑 Keyword Extraction")
+        with st.expander("What is Keyword Extraction?", expanded=False):
+            st.markdown("""
+            **Keyword Extraction** identifies the most important words or phrases in text using TF-IDF or frequency analysis.
+            This helps understand the main topics and themes.
+            """)
+        
+        keywords = analyzer.keyword_extraction_tfidf(text_input, top_k=15)
+        
+        if keywords:
+            # Display keywords as a bar chart using Streamlit
+            df_keywords = pd.DataFrame(keywords, columns=['Keyword', 'Score'])
+            st.bar_chart(df_keywords.set_index('Keyword')['Score'])
+            
+            # Display keywords in columns
+            col1, col2 = st.columns(2)
+            mid = len(keywords) // 2
+            
+            with col1:
+                st.write("**Top Keywords:**")
+                for word, score in keywords[:mid]:
+                    st.write(f"• {word}: {score:.3f}")
+            
+            with col2:
+                st.write("**More Keywords:**")
+                for word, score in keywords[mid:]:
+                    st.write(f"• {word}: {score:.3f}")
+    
+    # N-gram Analysis
+    if "ngrams" in selected_concepts:
+        st.subheader("📈 N-gram Analysis")
+        with st.expander("What are N-grams?", expanded=False):
+            st.markdown("""
+            **N-grams** are sequences of N consecutive words. They help identify common phrases and patterns in text.
+            - Bigrams (2-grams): pairs of words
+            - Trigrams (3-grams): sequences of three words
+            """)
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.write("**Bigrams (2-word phrases):**")
+            bigrams = analyzer.ngram_analysis(text_input, n=2, top_k=10)
+            for ngram, count in bigrams[:8]:
+                st.write(f"• {ngram}: {count}")
+        
+        with col2:
+            st.write("**Trigrams (3-word phrases):**")
+            trigrams = analyzer.ngram_analysis(text_input, n=3, top_k=10)
+            for ngram, count in trigrams[:8]:
+                st.write(f"• {ngram}: {count}")
+    
+    # Topic Modeling
+    if "topics" in selected_concepts:
+        st.subheader("🎯 Topic Modeling")
+        with st.expander("What is Topic Modeling?", expanded=False):
+            st.markdown("""
+            **Topic Modeling** automatically discovers hidden topics in text using algorithms like LDA (Latent Dirichlet Allocation).
+            Each topic is represented by a set of related words.
+            """)
+        
+        topics = analyzer.topic_modeling_simple(text_input, n_topics=3)
+        
+        if topics:
+            for topic in topics:
+                st.write(f"**Topic {topic['topic_id'] + 1}:**")
+                topic_words = ", ".join(topic['words'])
+                st.write(f"• Key words: {topic_words}")
+        else:
+            st.info("Not enough text for topic modeling. Try a longer document.")
+    
+    # Privacy Pattern Analysis
+    if "privacy_patterns" in selected_concepts:
+        st.subheader("🔍 Privacy-Specific Pattern Analysis")
+        with st.expander("What is Privacy Pattern Analysis?", expanded=False):
+            st.markdown("""
+            **Privacy Pattern Analysis** looks for specific patterns related to data privacy, such as:
+            - Data collection language
+            - Data sharing indicators
+            - Vague or ambiguous terms
+            - User rights mentions
+            """)
+        
+        patterns = analyzer.analyze_privacy_patterns(text_input)
+        
+        for category, data in patterns.items():
+            if data['terms']:
+                category_name = category.replace('_', ' ').title()
+                st.write(f"**{category_name}:** {data['total_count']} occurrences")
+                
+                terms_text = ", ".join([f"{term['term']} ({term['count']})" for term in data['terms'][:5]])
+                st.write(f"• {terms_text}")
+    
+    # Language Complexity
+    if "complexity" in selected_concepts:
+        st.subheader("🎓 Language Complexity Analysis")
+        with st.expander("What is Language Complexity Analysis?", expanded=False):
+            st.markdown("""
+            **Language Complexity Analysis** measures how difficult the text is to understand by analyzing:
+            - Average word length
+            - Complex words (long or multi-syllabic)
+            - Technical jargon usage
+            """)
+        
+        complexity = analyzer.language_complexity_analysis(text_input)
+        
+        if complexity:
+            col1, col2, col3 = st.columns(3)
+            
+            col1.metric("Avg Word Length", f"{complexity['avg_word_length']:.1f} chars")
+            col2.metric("Complex Word Ratio", f"{complexity['complex_word_ratio']:.1%}")
+            col3.metric("Jargon Ratio", f"{complexity['jargon_ratio']:.1%}")
+            
+            if complexity['complex_words']:
+                st.write("**Sample Complex Words:**")
+                st.write(", ".join(complexity['complex_words']))
+            
+            if complexity['jargon_terms']:
+                st.write("**Technical/Legal Jargon Found:**")
+                st.write(", ".join(complexity['jargon_terms']))
+
+def display_text_comparison_tool():
+    """Display text comparison and similarity analysis tool"""
+    st.markdown('<h1 class="main-header">📊 Text Comparison & Similarity Analysis</h1>', unsafe_allow_html=True)
+    
+    if NLPAnalyzer is None:
+        st.error("NLP Analyzer not available. Please check the nlp_concepts.py file.")
+        return
+    
+    analyzer = NLPAnalyzer()
+    
+    st.markdown("""
+    Compare two texts to analyze their similarity and differences. This is useful for:
+    - Comparing different versions of privacy policies
+    - Analyzing similar documents from different companies
+    - Understanding content overlap and uniqueness
+    """)
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.subheader("📄 Text 1")
+        text1 = st.text_area(
+            "Enter first text:",
+            height=200,
+            placeholder="Paste the first text here..."
+        )
+    
+    with col2:
+        st.subheader("📄 Text 2")
+        text2 = st.text_area(
+            "Enter second text:",
+            height=200,
+            placeholder="Paste the second text here..."
+        )
+    
+    if text1.strip() and text2.strip():
+        st.markdown("---")
+        
+        # Calculate similarity
+        similarity = analyzer.text_similarity(text1, text2)
+        
+        # Display similarity score
+        st.subheader("🔍 Similarity Analysis")
+        
+        similarity_percentage = similarity * 100
+        
+        if similarity_percentage >= 80:
+            similarity_level = "Very High 🟢"
+            color = "success"
+        elif similarity_percentage >= 60:
+            similarity_level = "High 🟡"
+            color = "warning"
+        elif similarity_percentage >= 40:
+            similarity_level = "Moderate 🟠"
+            color = "warning"
+        elif similarity_percentage >= 20:
+            similarity_level = "Low 🔴"
+            color = "error"
+        else:
+            similarity_level = "Very Low ⚫"
+            color = "error"
+        
+        st.markdown(f"""
+        <div class="card {color}-card">
+            <h4>📈 Similarity Score</h4>
+            <p><strong>Score:</strong> {similarity_percentage:.1f}%</p>
+            <p><strong>Level:</strong> {similarity_level}</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Comparative analysis
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.subheader("📊 Text 1 Analysis")
+            stats1 = analyzer.text_statistics(text1)
+            keywords1 = analyzer.keyword_extraction_tfidf(text1, top_k=10)
+            
+            st.metric("Word Count", stats1['word_count'])
+            st.metric("Unique Words", stats1['unique_words'])
+            st.metric("Readability", f"{stats1['flesch_reading_ease']:.0f}")
+            
+            st.write("**Top Keywords:**")
+            for word, score in keywords1[:5]:
+                st.write(f"• {word}")
+        
+        with col2:
+            st.subheader("📊 Text 2 Analysis")
+            stats2 = analyzer.text_statistics(text2)
+            keywords2 = analyzer.keyword_extraction_tfidf(text2, top_k=10)
+            
+            st.metric("Word Count", stats2['word_count'])
+            st.metric("Unique Words", stats2['unique_words'])
+            st.metric("Readability", f"{stats2['flesch_reading_ease']:.0f}")
+            
+            st.write("**Top Keywords:**")
+            for word, score in keywords2[:5]:
+                st.write(f"• {word}")
+        
+        # Common and unique elements
+        st.subheader("🔍 Content Analysis")
+        
+        words1 = set(re.findall(r'\b\w+\b', text1.lower()))
+        words2 = set(re.findall(r'\b\w+\b', text2.lower()))
+        
+        common_words = words1.intersection(words2)
+        unique_to_1 = words1 - words2
+        unique_to_2 = words2 - words1
+        
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            st.write("**Common Words:**")
+            st.write(f"{len(common_words)} words")
+            if common_words:
+                sample_common = list(common_words)[:10]
+                st.write(", ".join(sample_common))
+        
+        with col2:
+            st.write("**Unique to Text 1:**")
+            st.write(f"{len(unique_to_1)} words")
+            if unique_to_1:
+                sample_unique1 = list(unique_to_1)[:10]
+                st.write(", ".join(sample_unique1))
+        
+        with col3:
+            st.write("**Unique to Text 2:**")
+            st.write(f"{len(unique_to_2)} words")
+            if unique_to_2:
+                sample_unique2 = list(unique_to_2)[:10]
+                st.write(", ".join(sample_unique2))
+    
+    else:
+        st.info("Please enter text in both fields to compare.")
+
 def main():
     """Main Streamlit application"""
     
@@ -445,6 +940,19 @@ def main():
     """, unsafe_allow_html=True)
     
     # Navigation
+    page = st.sidebar.selectbox(
+        "Choose Page:",
+        ["🔐 Privacy Policy Analysis", "🧠 NLP Concepts Demo", "📊 Text Comparison"]
+    )
+    
+    if page == "🧠 NLP Concepts Demo":
+        display_nlp_concepts_demo()
+        return
+    elif page == "📊 Text Comparison":
+        display_text_comparison_tool()
+        return
+    
+    # Original privacy policy analysis section
     analysis_type = st.sidebar.radio(
         "Choose Input Method:",
         ["📄 Upload PDF", "🔗 Enter URL", "📝 Paste Text"]
