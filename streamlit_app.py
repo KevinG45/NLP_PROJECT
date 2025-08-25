@@ -16,6 +16,11 @@ import re
 import warnings
 import pandas as pd
 from collections import Counter
+import time
+import psutil
+import plotly.express as px
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 warnings.filterwarnings('ignore')
 
 # Import our enhanced NLP concepts module
@@ -919,6 +924,267 @@ def display_text_comparison_tool():
     else:
         st.info("Please enter text in both fields to compare.")
 
+def display_stats_for_nerds():
+    """Display detailed stats about NLP processes running in the background"""
+    st.markdown('<h1 class="main-header">🤓 Stats for Nerds</h1>', unsafe_allow_html=True)
+    
+    if NLPAnalyzer is None:
+        st.error("NLP Analyzer not available. Please check the nlp_concepts.py file.")
+        return
+    
+    st.markdown("""
+    <div class="card">
+        <h3>🔍 Background NLP Process Monitor</h3>
+        <p>This section shows detailed information about what's happening behind the scenes when text is processed through our NLP pipeline.</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    analyzer = NLPAnalyzer()
+    
+    # Text input section
+    st.subheader("📝 Enter Text for Deep Analysis")
+    demo_text = """
+    We collect personal information including your name, email address, and location data when you use our services. 
+    This information may be shared with third-party partners for business purposes. We store your data securely 
+    using industry-standard encryption. You have the right to opt-out of data sharing at any time by contacting 
+    our privacy team at privacy@company.com. We reserve the right to update this policy as needed for compliance purposes.
+    """
+    
+    text_input = st.text_area(
+        "Enter text to analyze:",
+        value=demo_text,
+        height=150,
+        help="Enter any text to see detailed processing statistics"
+    )
+    
+    if not text_input.strip():
+        st.warning("Please enter some text to analyze.")
+        return
+    
+    # Real-time processing with metrics
+    st.markdown("---")
+    st.subheader("⚡ Real-time Processing Pipeline")
+    
+    # Create columns for metrics
+    col1, col2, col3, col4 = st.columns(4)
+    
+    # Initialize metrics containers
+    with col1:
+        total_time_metric = st.empty()
+    with col2:
+        memory_metric = st.empty()
+    with col3:
+        steps_metric = st.empty()
+    with col4:
+        tokens_metric = st.empty()
+    
+    # Processing pipeline with timing
+    pipeline_steps = []
+    total_start_time = time.time()
+    
+    # Step 1: Tokenization
+    step_start = time.time()
+    tokens = analyzer.basic_tokenization(text_input)
+    step_time = time.time() - step_start
+    pipeline_steps.append({
+        'step': 'Tokenization',
+        'time_ms': step_time * 1000,
+        'output_size': len(tokens.get('word_tokens', [])),
+        'memory_mb': psutil.Process().memory_info().rss / 1024 / 1024
+    })
+    
+    # Step 2: POS Tagging
+    step_start = time.time()
+    pos_tags = analyzer.pos_tagging_simple(text_input)
+    step_time = time.time() - step_start
+    pipeline_steps.append({
+        'step': 'POS Tagging',
+        'time_ms': step_time * 1000,
+        'output_size': len(pos_tags),
+        'memory_mb': psutil.Process().memory_info().rss / 1024 / 1024
+    })
+    
+    # Step 3: Named Entity Recognition
+    step_start = time.time()
+    entities = analyzer.named_entity_recognition(text_input)
+    step_time = time.time() - step_start
+    entity_count = sum(len(ent_list) for ent_list in entities.values())
+    pipeline_steps.append({
+        'step': 'Named Entity Recognition',
+        'time_ms': step_time * 1000,
+        'output_size': entity_count,
+        'memory_mb': psutil.Process().memory_info().rss / 1024 / 1024
+    })
+    
+    # Step 4: Sentiment Analysis
+    step_start = time.time()
+    sentiment = analyzer.sentiment_analysis_simple(text_input)
+    step_time = time.time() - step_start
+    pipeline_steps.append({
+        'step': 'Sentiment Analysis',
+        'time_ms': step_time * 1000,
+        'output_size': 1,  # One sentiment result
+        'memory_mb': psutil.Process().memory_info().rss / 1024 / 1024
+    })
+    
+    # Step 5: Text Statistics
+    step_start = time.time()
+    stats = analyzer.text_statistics(text_input)
+    step_time = time.time() - step_start
+    pipeline_steps.append({
+        'step': 'Text Statistics',
+        'time_ms': step_time * 1000,
+        'output_size': len(stats),
+        'memory_mb': psutil.Process().memory_info().rss / 1024 / 1024
+    })
+    
+    # Step 6: Keyword Extraction
+    step_start = time.time()
+    keywords = analyzer.keyword_extraction_tfidf(text_input, top_k=15)
+    step_time = time.time() - step_start
+    pipeline_steps.append({
+        'step': 'Keyword Extraction',
+        'time_ms': step_time * 1000,
+        'output_size': len(keywords),
+        'memory_mb': psutil.Process().memory_info().rss / 1024 / 1024
+    })
+    
+    total_time = time.time() - total_start_time
+    
+    # Update metrics
+    total_time_metric.metric("Total Processing Time", f"{total_time*1000:.1f} ms")
+    memory_metric.metric("Memory Usage", f"{psutil.Process().memory_info().rss / 1024 / 1024:.1f} MB")
+    steps_metric.metric("Pipeline Steps", len(pipeline_steps))
+    tokens_metric.metric("Total Tokens", len(tokens.get('word_tokens', [])))
+    
+    # Create pipeline visualization
+    st.subheader("🔄 Processing Pipeline Visualization")
+    
+    # Create DataFrame for pipeline steps
+    df_pipeline = pd.DataFrame(pipeline_steps)
+    
+    # Create timing chart
+    fig_timing = px.bar(
+        df_pipeline, 
+        x='step', 
+        y='time_ms',
+        title="Processing Time by Pipeline Step",
+        labels={'time_ms': 'Time (milliseconds)', 'step': 'Pipeline Step'},
+        color='time_ms',
+        color_continuous_scale='viridis'
+    )
+    fig_timing.update_layout(xaxis_tickangle=-45)
+    st.plotly_chart(fig_timing, use_container_width=True)
+    
+    # Memory usage chart
+    fig_memory = px.line(
+        df_pipeline,
+        x='step',
+        y='memory_mb',
+        title="Memory Usage Throughout Pipeline",
+        labels={'memory_mb': 'Memory (MB)', 'step': 'Pipeline Step'},
+        markers=True
+    )
+    fig_memory.update_layout(xaxis_tickangle=-45)
+    st.plotly_chart(fig_memory, use_container_width=True)
+    
+    # Detailed step breakdown
+    st.subheader("📊 Detailed Step Analysis")
+    
+    for i, step in enumerate(pipeline_steps):
+        with st.expander(f"Step {i+1}: {step['step']}", expanded=False):
+            col1, col2, col3 = st.columns(3)
+            col1.metric("Processing Time", f"{step['time_ms']:.2f} ms")
+            col2.metric("Output Size", step['output_size'])
+            col3.metric("Memory Usage", f"{step['memory_mb']:.1f} MB")
+            
+            # Show step-specific details
+            if step['step'] == 'Tokenization':
+                st.json({
+                    'word_count': tokens['word_count'],
+                    'sentence_count': tokens['sentence_count'],
+                    'char_count': tokens['char_count'],
+                    'paragraph_count': tokens.get('paragraph_count', 0)
+                })
+            elif step['step'] == 'POS Tagging':
+                pos_counts = Counter([tag for _, tag in pos_tags])
+                st.json(dict(pos_counts))
+            elif step['step'] == 'Named Entity Recognition':
+                entity_summary = {k: len(v) for k, v in entities.items() if v}
+                st.json(entity_summary if entity_summary else {"No entities found": 0})
+            elif step['step'] == 'Sentiment Analysis':
+                st.json({
+                    'sentiment': sentiment['sentiment'],
+                    'score': round(sentiment['score'], 4),
+                    'positive_words': sentiment['positive'],
+                    'negative_words': sentiment['negative']
+                })
+            elif step['step'] == 'Text Statistics':
+                st.json({
+                    'lexical_diversity': round(stats['lexical_diversity'], 4),
+                    'avg_words_per_sentence': round(stats['avg_words_per_sentence'], 2),
+                    'avg_chars_per_word': round(stats['avg_chars_per_word'], 2),
+                    'flesch_reading_ease': round(stats['flesch_reading_ease'], 2)
+                })
+            elif step['step'] == 'Keyword Extraction':
+                keyword_dict = {word: round(score, 4) for word, score in keywords[:10]}
+                st.json(keyword_dict)
+    
+    # Model information section
+    st.subheader("🤖 Model & System Information")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("""
+        **NLP Pipeline Configuration:**
+        - Tokenizer: Regular Expression Based
+        - POS Tagger: Pattern Matching
+        - NER: Pattern-based Recognition
+        - Sentiment: Lexicon-based Analysis
+        - Keywords: TF-IDF Vectorization
+        - Statistics: Custom Readability Metrics
+        """)
+    
+    with col2:
+        st.markdown(f"""
+        **System Resources:**
+        - CPU Cores: {psutil.cpu_count()}
+        - Total Memory: {psutil.virtual_memory().total / 1024 / 1024 / 1024:.1f} GB
+        - Available Memory: {psutil.virtual_memory().available / 1024 / 1024 / 1024:.1f} GB
+        - Python Version: {psutil.sys.version.split()[0]}
+        - Process ID: {psutil.os.getpid()}
+        """)
+    
+    # Raw data inspection
+    st.subheader("🔍 Raw Data Inspection")
+    
+    inspection_type = st.selectbox(
+        "Select data to inspect:",
+        ["Tokenization Output", "POS Tags", "Named Entities", "Sentiment Scores", "Text Statistics", "Keywords"]
+    )
+    
+    if inspection_type == "Tokenization Output":
+        st.json({
+            'word_tokens': tokens.get('word_tokens', [])[:50],  # First 50 tokens
+            'sentences': tokens.get('sentences', [])[:10],      # First 10 sentences
+            'metadata': {
+                'total_words': tokens.get('word_count', 0),
+                'total_sentences': tokens.get('sentence_count', 0),
+                'total_chars': tokens.get('char_count', 0)
+            }
+        })
+    elif inspection_type == "POS Tags":
+        st.json([{'word': word, 'tag': tag} for word, tag in pos_tags[:50]])
+    elif inspection_type == "Named Entities":
+        st.json(entities)
+    elif inspection_type == "Sentiment Scores":
+        st.json(sentiment)
+    elif inspection_type == "Text Statistics":
+        st.json(stats)
+    elif inspection_type == "Keywords":
+        st.json([{'keyword': word, 'score': score} for word, score in keywords])
+
 def main():
     """Main Streamlit application"""
     
@@ -948,7 +1214,7 @@ def main():
     # Navigation
     page = st.sidebar.selectbox(
         "Choose Page:",
-        ["🔐 Privacy Policy Analysis", "🧠 NLP Concepts Demo", "📊 Text Comparison"]
+        ["🔐 Privacy Policy Analysis", "🧠 NLP Concepts Demo", "📊 Text Comparison", "🤓 Stats for Nerds"]
     )
     
     if page == "🧠 NLP Concepts Demo":
@@ -956,6 +1222,9 @@ def main():
         return
     elif page == "📊 Text Comparison":
         display_text_comparison_tool()
+        return
+    elif page == "🤓 Stats for Nerds":
+        display_stats_for_nerds()
         return
     
     # Original privacy policy analysis section
