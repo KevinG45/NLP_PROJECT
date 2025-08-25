@@ -175,6 +175,9 @@ class NLPAnalyzer:
         else:
             stats['flesch_reading_ease'] = 0
         
+        # Perplexity score
+        stats['perplexity'] = self.calculate_perplexity(text)
+        
         return stats
     
     def _count_syllables(self, word):
@@ -194,6 +197,59 @@ class NLPAnalyzer:
             count -= 1
         
         return max(1, count)
+    
+    def calculate_perplexity(self, text):
+        """Calculate perplexity score using n-gram language model"""
+        import math
+        from collections import defaultdict
+        
+        # Clean and tokenize text
+        words = re.findall(r'\b\w+\b', text.lower())
+        
+        if len(words) < 3:
+            return 0.0  # Not enough text for meaningful perplexity
+        
+        # Add sentence boundary markers
+        words = ['<s>'] + words + ['</s>']
+        
+        # Build bigram and unigram counts
+        unigram_counts = defaultdict(int)
+        bigram_counts = defaultdict(int)
+        
+        for i, word in enumerate(words):
+            unigram_counts[word] += 1
+            if i > 0:
+                bigram = (words[i-1], word)
+                bigram_counts[bigram] += 1
+        
+        # Calculate perplexity using bigram model with add-1 smoothing
+        log_prob_sum = 0.0
+        n_bigrams = 0
+        vocabulary_size = len(unigram_counts)
+        
+        for i in range(1, len(words)):
+            prev_word = words[i-1]
+            curr_word = words[i]
+            bigram = (prev_word, curr_word)
+            
+            # Add-1 smoothing
+            bigram_count = bigram_counts[bigram]
+            unigram_count = unigram_counts[prev_word]
+            
+            # Smoothed probability: (count + 1) / (context_count + vocabulary_size)
+            smoothed_prob = (bigram_count + 1) / (unigram_count + vocabulary_size)
+            
+            log_prob_sum += math.log2(smoothed_prob)
+            n_bigrams += 1
+        
+        if n_bigrams == 0:
+            return 0.0
+        
+        # Perplexity = 2^(-1/N * sum(log2(P(w_i))))
+        avg_log_prob = log_prob_sum / n_bigrams
+        perplexity = 2 ** (-avg_log_prob)
+        
+        return perplexity
     
     def keyword_extraction_tfidf(self, text, top_k=10):
         """Extract keywords using TF-IDF"""

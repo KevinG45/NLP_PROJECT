@@ -626,16 +626,21 @@ def display_nlp_concepts_demo():
         with st.expander("What are Text Statistics?", expanded=False):
             st.markdown("""
             **Text Statistics** provide quantitative measures of text complexity, readability, and structure.
-            These metrics help assess document quality and accessibility.
+            These metrics help assess document quality and accessibility:
+            
+            - **Lexical Diversity**: Ratio of unique words to total words (higher = more varied vocabulary)
+            - **Perplexity**: Measures text predictability (lower = more coherent/predictable text)
+            - **Flesch Reading Ease**: Readability score (higher = easier to read)
             """)
         
         stats = analyzer.text_statistics(text_input)
         
-        col1, col2, col3 = st.columns(3)
+        col1, col2, col3, col4 = st.columns(4)
         
         col1.metric("Lexical Diversity", f"{stats['lexical_diversity']:.3f}")
         col2.metric("Avg Words/Sentence", f"{stats['avg_words_per_sentence']:.1f}")
         col3.metric("Avg Chars/Word", f"{stats['avg_chars_per_word']:.1f}")
+        col4.metric("Perplexity", f"{stats['perplexity']:.1f}")
         
         # Readability score
         flesch_score = stats['flesch_reading_ease']
@@ -658,13 +663,46 @@ def display_nlp_concepts_demo():
             readability = "Difficult 😰"
             color = "error"
         
-        st.markdown(f"""
-        <div class="card {color}-card">
-            <h4>📖 Readability Score</h4>
-            <p><strong>Flesch Reading Ease:</strong> {flesch_score:.1f}</p>
-            <p><strong>Level:</strong> {readability}</p>
-        </div>
-        """, unsafe_allow_html=True)
+        # Perplexity interpretation
+        perplexity = stats['perplexity']
+        if perplexity == 0:
+            perplexity_level = "N/A"
+            perplexity_color = "secondary"
+        elif perplexity <= 50:
+            perplexity_level = "Very Coherent 🎯"
+            perplexity_color = "success"
+        elif perplexity <= 100:
+            perplexity_level = "Coherent 👍"
+            perplexity_color = "success"
+        elif perplexity <= 200:
+            perplexity_level = "Moderately Coherent 🤔"
+            perplexity_color = "info"
+        elif perplexity <= 500:
+            perplexity_level = "Less Coherent 😐"
+            perplexity_color = "warning"
+        else:
+            perplexity_level = "Incoherent 😕"
+            perplexity_color = "error"
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown(f"""
+            <div class="card {color}-card">
+                <h4>📖 Readability Score</h4>
+                <p><strong>Flesch Reading Ease:</strong> {flesch_score:.1f}</p>
+                <p><strong>Level:</strong> {readability}</p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col2:
+            st.markdown(f"""
+            <div class="card {perplexity_color}-card">
+                <h4>🎲 Text Perplexity</h4>
+                <p><strong>Perplexity Score:</strong> {perplexity:.1f}</p>
+                <p><strong>Level:</strong> {perplexity_level}</p>
+            </div>
+            """, unsafe_allow_html=True)
     
     # Keyword Extraction
     if "keywords" in selected_concepts:
@@ -1125,16 +1163,21 @@ def display_stats_for_nerds():
             with st.expander("What are Text Statistics?", expanded=False):
                 st.markdown("""
                 **Text Statistics** provide quantitative measures of text complexity, readability, and structure.
-                These metrics help assess document quality and accessibility.
+                These metrics help assess document quality and accessibility:
+                
+                - **Lexical Diversity**: Ratio of unique words to total words (higher = more varied vocabulary)
+                - **Perplexity**: Measures text predictability (lower = more coherent/predictable text)
+                - **Flesch Reading Ease**: Readability score (higher = easier to read)
                 """)
             
             stats = analyzer.text_statistics(text_input)
             
-            col1, col2, col3 = st.columns(3)
+            col1, col2, col3, col4 = st.columns(4)
             
             col1.metric("Lexical Diversity", f"{stats['lexical_diversity']:.3f}")
             col2.metric("Avg Words/Sentence", f"{stats['avg_words_per_sentence']:.1f}")
             col3.metric("Avg Chars/Word", f"{stats['avg_chars_per_word']:.1f}")
+            col4.metric("Perplexity", f"{stats['perplexity']:.1f}")
             
             # Readability score
             flesch_score = stats['flesch_reading_ease']
@@ -1157,13 +1200,46 @@ def display_stats_for_nerds():
                 readability = "Difficult 😰"
                 color = "error"
             
-            st.markdown(f"""
-            <div class="card {color}-card">
-                <h4>📖 Readability Score</h4>
-                <p><strong>Flesch Reading Ease:</strong> {flesch_score:.1f}</p>
-                <p><strong>Level:</strong> {readability}</p>
-            </div>
-            """, unsafe_allow_html=True)
+            # Perplexity interpretation
+            perplexity = stats['perplexity']
+            if perplexity == 0:
+                perplexity_level = "N/A"
+                perplexity_color = "secondary"
+            elif perplexity <= 50:
+                perplexity_level = "Very Coherent 🎯"
+                perplexity_color = "success"
+            elif perplexity <= 100:
+                perplexity_level = "Coherent 👍"
+                perplexity_color = "success"
+            elif perplexity <= 200:
+                perplexity_level = "Moderately Coherent 🤔"
+                perplexity_color = "info"
+            elif perplexity <= 500:
+                perplexity_level = "Less Coherent 😐"
+                perplexity_color = "warning"
+            else:
+                perplexity_level = "Incoherent 😕"
+                perplexity_color = "error"
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.markdown(f"""
+                <div class="card {color}-card">
+                    <h4>📖 Readability Score</h4>
+                    <p><strong>Flesch Reading Ease:</strong> {flesch_score:.1f}</p>
+                    <p><strong>Level:</strong> {readability}</p>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            with col2:
+                st.markdown(f"""
+                <div class="card {perplexity_color}-card">
+                    <h4>🎲 Text Perplexity</h4>
+                    <p><strong>Perplexity Score:</strong> {perplexity:.1f}</p>
+                    <p><strong>Level:</strong> {perplexity_level}</p>
+                </div>
+                """, unsafe_allow_html=True)
         
         # Keyword Extraction
         if "keywords" in selected_concepts:
@@ -1476,7 +1552,8 @@ def display_stats_for_nerds():
                         'lexical_diversity': round(stats_perf['lexical_diversity'], 4),
                         'avg_words_per_sentence': round(stats_perf['avg_words_per_sentence'], 2),
                         'avg_chars_per_word': round(stats_perf['avg_chars_per_word'], 2),
-                        'flesch_reading_ease': round(stats_perf['flesch_reading_ease'], 2)
+                        'flesch_reading_ease': round(stats_perf['flesch_reading_ease'], 2),
+                        'perplexity': round(stats_perf['perplexity'], 2)
                     })
                 elif step['step'] == 'Keyword Extraction':
                     keyword_dict = {word: round(score, 4) for word, score in keywords_perf[:10]}
