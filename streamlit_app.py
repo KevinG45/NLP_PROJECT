@@ -307,8 +307,8 @@ def summarize_text(text, model_package):
         
         # Check if this is a function (simple summarizer) or pipeline (transformer)
         if callable(summarizer):
-            # Simple extractive summarizer
-            return summarizer(text)
+            # Enhanced extractive summarizer - use longer max_length for better coverage
+            return summarizer(text, max_length=300, min_length=75)
         else:
             # Original transformer summarizer
             # Limit text length for summarization

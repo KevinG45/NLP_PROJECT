@@ -28,38 +28,242 @@ import datasets
 from datasets import Dataset
 
 class SimpleSummarizer:
-    """Simple extractive summarization class"""
+    """Enhanced extractive summarization class for privacy policies"""
     
     def __init__(self):
-        self.keywords = ['data', 'information', 'collect', 'share', 'privacy', 'policy', 'personal']
-    
-    def __call__(self, text, max_length=150, min_length=50):
-        """Simple extractive summarization"""
-        sentences = text.split('.')
-        sentences = [s.strip() for s in sentences if len(s.strip()) > 20]
+        # Comprehensive privacy policy keywords organized by category
+        self.data_collection_keywords = [
+            'collect', 'gather', 'obtain', 'receive', 'acquire', 'capture',
+            'personal information', 'personal data', 'user data', 'user information',
+            'name', 'email', 'address', 'phone', 'location', 'browsing', 'ip address',
+            'cookies', 'tracking', 'analytics', 'profile'
+        ]
         
-        if len(sentences) <= 3:
+        self.data_sharing_keywords = [
+            'share', 'disclose', 'provide', 'transfer', 'sell', 'distribute',
+            'third party', 'third-party', 'partners', 'affiliates', 'vendors',
+            'service providers', 'marketing', 'advertising', 'analytics companies'
+        ]
+        
+        self.data_storage_keywords = [
+            'store', 'retain', 'keep', 'maintain', 'preserve', 'hold',
+            'servers', 'database', 'cloud', 'security', 'encryption', 'protect',
+            'secure', 'safeguard', 'unauthorized access', 'data breach'
+        ]
+        
+        self.user_rights_keywords = [
+            'rights', 'access', 'delete', 'modify', 'correct', 'update',
+            'opt-out', 'unsubscribe', 'withdraw consent', 'control',
+            'choice', 'preferences', 'request', 'contact'
+        ]
+        
+        self.policy_updates_keywords = [
+            'update', 'change', 'modify', 'revise', 'amend', 'notify',
+            'notification', 'effective date', 'changes to policy'
+        ]
+        
+        # Category weights for balanced summary
+        self.category_weights = {
+            'collection': 1.5,  # High priority
+            'sharing': 1.4,     # High priority  
+            'storage': 1.2,     # Medium-high priority
+            'rights': 1.3,      # Medium-high priority
+            'updates': 1.0      # Medium priority
+        }
+    
+    def _preprocess_text(self, text):
+        """Better text preprocessing"""
+        import re
+        from collections import defaultdict
+        
+        # Remove extra whitespace
+        text = re.sub(r'\s+', ' ', text)
+        
+        # Better sentence splitting that handles common abbreviations
+        # Split on sentence endings but preserve abbreviations
+        sentences = re.split(r'(?<!\w\.\w.)(?<![A-Z][a-z]\.)(?<=\.|\!|\?)\s+', text)
+        
+        # Clean and filter sentences
+        cleaned_sentences = []
+        for sentence in sentences:
+            sentence = sentence.strip()
+            # Filter out very short sentences, headers, and navigation text
+            if (len(sentence) > 25 and 
+                not sentence.isupper() and  # Skip all-caps headers
+                not re.match(r'^(home|about|contact|privacy|terms)', sentence.lower()) and
+                '.' in sentence):  # Must contain a period to be a complete sentence
+                cleaned_sentences.append(sentence)
+        
+        return cleaned_sentences
+    
+    def _categorize_sentence(self, sentence):
+        """Categorize sentence by privacy policy section"""
+        from collections import defaultdict
+        
+        sentence_lower = sentence.lower()
+        scores = defaultdict(int)
+        
+        # Check for data collection indicators
+        for keyword in self.data_collection_keywords:
+            if keyword in sentence_lower:
+                scores['collection'] += 1
+        
+        # Check for data sharing indicators  
+        for keyword in self.data_sharing_keywords:
+            if keyword in sentence_lower:
+                scores['sharing'] += 1
+                
+        # Check for data storage indicators
+        for keyword in self.data_storage_keywords:
+            if keyword in sentence_lower:
+                scores['storage'] += 1
+                
+        # Check for user rights indicators
+        for keyword in self.user_rights_keywords:
+            if keyword in sentence_lower:
+                scores['rights'] += 1
+                
+        # Check for policy updates indicators
+        for keyword in self.policy_updates_keywords:
+            if keyword in sentence_lower:
+                scores['updates'] += 1
+        
+        # Return the category with highest score, or None if no match
+        if scores:
+            return max(scores.items(), key=lambda x: x[1])[0]
+        return None
+    
+    def _score_sentence(self, sentence, position_ratio):
+        """Enhanced sentence scoring algorithm"""
+        sentence_lower = sentence.lower()
+        score = 0
+        
+        # Base score from sentence length (but cap it to avoid overly long sentences)
+        length_score = min(len(sentence) * 0.1, 20)
+        score += length_score
+        
+        # Position scoring - earlier sentences get slight boost
+        position_score = (1.0 - position_ratio) * 10
+        score += position_score
+        
+        # Keyword matching with category weights
+        category = self._categorize_sentence(sentence)
+        if category:
+            category_weight = self.category_weights.get(category, 1.0)
+            
+            # Count keyword matches in this category
+            keyword_matches = 0
+            if category == 'collection':
+                keyword_matches = sum(1 for kw in self.data_collection_keywords if kw in sentence_lower)
+            elif category == 'sharing':
+                keyword_matches = sum(1 for kw in self.data_sharing_keywords if kw in sentence_lower)
+            elif category == 'storage':
+                keyword_matches = sum(1 for kw in self.data_storage_keywords if kw in sentence_lower)
+            elif category == 'rights':
+                keyword_matches = sum(1 for kw in self.user_rights_keywords if kw in sentence_lower)
+            elif category == 'updates':
+                keyword_matches = sum(1 for kw in self.policy_updates_keywords if kw in sentence_lower)
+            
+            # Apply category weight and keyword bonus
+            score += keyword_matches * 15 * category_weight
+        
+        # Bonus for specific important phrases
+        important_phrases = [
+            'personal information', 'third party', 'third-party', 'we collect',
+            'we share', 'we store', 'we use', 'you can', 'your rights',
+            'contact us', 'opt out', 'delete your', 'access your'
+        ]
+        
+        phrase_bonus = sum(10 for phrase in important_phrases if phrase in sentence_lower)
+        score += phrase_bonus
+        
+        # Penalty for generic/vague sentences
+        vague_indicators = ['may', 'might', 'could', 'generally', 'typically', 'usually']
+        vague_penalty = sum(5 for indicator in vague_indicators if indicator in sentence_lower)
+        score -= vague_penalty
+        
+        return score
+    
+    def _select_diverse_sentences(self, scored_sentences, target_count=3):
+        """Select sentences that cover different aspects of privacy policy"""
+        if len(scored_sentences) <= target_count:
+            return [sent[1] for sent in scored_sentences]
+        
+        selected = []
+        categories_covered = set()
+        
+        # Sort by score first
+        scored_sentences.sort(key=lambda x: x[0], reverse=True)
+        
+        # First pass: Select top sentence from each category
+        for score, sentence in scored_sentences:
+            category = self._categorize_sentence(sentence)
+            if category and category not in categories_covered:
+                selected.append(sentence)
+                categories_covered.add(category)
+                if len(selected) >= target_count:
+                    break
+        
+        # Second pass: Fill remaining slots with highest scoring sentences
+        if len(selected) < target_count:
+            for score, sentence in scored_sentences:
+                if sentence not in selected:
+                    selected.append(sentence)
+                    if len(selected) >= target_count:
+                        break
+        
+        return selected[:target_count]
+    
+    def __call__(self, text, max_length=250, min_length=50):
+        """Enhanced extractive summarization"""
+        if not text or len(text.strip()) < 50:
+            return text if text else "No content to summarize."
+        
+        # Preprocess and extract sentences
+        sentences = self._preprocess_text(text)
+        
+        if len(sentences) <= 2:
+            # If very few sentences, return truncated text
             return text[:max_length] + "..." if len(text) > max_length else text
         
-        # Score sentences by length and keyword presence
+        # Score all sentences
         scored_sentences = []
+        total_sentences = len(sentences)
         
-        for sentence in sentences[:10]:  # Limit to first 10 sentences
-            score = len(sentence)  # Prefer longer sentences
-            for keyword in self.keywords:
-                if keyword.lower() in sentence.lower():
-                    score += 50
+        for i, sentence in enumerate(sentences):
+            position_ratio = i / total_sentences if total_sentences > 1 else 0
+            score = self._score_sentence(sentence, position_ratio)
             scored_sentences.append((score, sentence))
         
-        # Sort by score and take top sentences
-        scored_sentences.sort(reverse=True)
-        selected_sentences = [sent[1] for sent in scored_sentences[:3]]
+        # Select diverse, high-quality sentences - try for more coverage
+        target_sentences = min(5, max(3, len(sentences) // 2))  # More adaptive count
+        selected_sentences = self._select_diverse_sentences(scored_sentences, target_sentences)
         
+        # Create summary
         summary = '. '.join(selected_sentences)
-        if len(summary) > max_length:
-            summary = summary[:max_length] + "..."
         
-        return summary
+        # Ensure summary fits length constraints
+        if len(summary) > max_length:
+            # Truncate to max_length but try to end at a sentence boundary
+            truncated = summary[:max_length]
+            last_period = truncated.rfind('.')
+            if last_period > max_length * 0.7:  # If we can keep most of the content
+                summary = truncated[:last_period + 1]
+            else:
+                summary = truncated + "..."
+        
+        # Ensure minimum length by adding more sentences if needed
+        if len(summary) < min_length and len(selected_sentences) < len(sentences):
+            remaining_sentences = [sent[1] for sent in scored_sentences 
+                                 if sent[1] not in selected_sentences]
+            for sentence in remaining_sentences:
+                test_summary = summary + '. ' + sentence
+                if len(test_summary) <= max_length:
+                    summary = test_summary
+                if len(summary) >= min_length:
+                    break
+        
+        return summary if summary.strip() else "Unable to generate meaningful summary."
 
 def download_opp115_dataset():
     """Download and extract the OPP-115 dataset"""
