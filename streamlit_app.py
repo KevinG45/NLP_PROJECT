@@ -922,6 +922,12 @@ def display_text_comparison_tool():
 def main():
     """Main Streamlit application"""
     
+    # Initialize session state for text content
+    if 'text_content' not in st.session_state:
+        st.session_state.text_content = None
+    if 'text_source' not in st.session_state:
+        st.session_state.text_source = None
+    
     # Header
     st.markdown('<h1 class="main-header">🔐 Privacy Policy Analyzer</h1>', unsafe_allow_html=True)
     
@@ -967,21 +973,21 @@ def main():
     st.sidebar.success("✅ Model loaded successfully!")
     
     # Main content area
-    text_content = None
-    
     if analysis_type == "📄 Upload PDF":
         st.subheader("📄 Upload Privacy Policy PDF")
         uploaded_file = st.file_uploader("Choose a PDF file", type="pdf")
         
         if uploaded_file is not None:
             with st.spinner("Extracting text from PDF..."):
-                text_content = extract_text_from_pdf(uploaded_file)
+                extracted_text = extract_text_from_pdf(uploaded_file)
                 
-            if text_content:
-                st.success(f"✅ Text extracted! ({len(text_content.split())} words)")
+            if extracted_text:
+                st.session_state.text_content = extracted_text
+                st.session_state.text_source = "PDF Upload"
+                st.success(f"✅ Text extracted! ({len(extracted_text.split())} words)")
                 
                 with st.expander("Preview extracted text"):
-                    st.text_area("Extracted Text", text_content[:1000] + "..." if len(text_content) > 1000 else text_content, height=200)
+                    st.text_area("Extracted Text", extracted_text[:1000] + "..." if len(extracted_text) > 1000 else extracted_text, height=200)
     
     elif analysis_type == "🔗 Enter URL":
         st.subheader("🔗 Enter Privacy Policy URL")
@@ -989,23 +995,38 @@ def main():
         
         if st.button("Extract Text from URL") and url:
             with st.spinner("Extracting text from URL..."):
-                text_content = extract_text_from_url(url)
+                extracted_text = extract_text_from_url(url)
             
-            if text_content:
-                st.success(f"✅ Text extracted! ({len(text_content.split())} words)")
+            if extracted_text:
+                st.session_state.text_content = extracted_text
+                st.session_state.text_source = f"URL: {url}"
+                st.success(f"✅ Text extracted! ({len(extracted_text.split())} words)")
                 
                 with st.expander("Preview extracted text"):
-                    st.text_area("Extracted Text", text_content[:1000] + "..." if len(text_content) > 1000 else text_content, height=200)
+                    st.text_area("Extracted Text", extracted_text[:1000] + "..." if len(extracted_text) > 1000 else extracted_text, height=200)
     
     elif analysis_type == "📝 Paste Text":
         st.subheader("📝 Paste Privacy Policy Text")
-        text_content = st.text_area("Privacy Policy Text", height=200, placeholder="Paste the privacy policy text here...")
+        text_input = st.text_area("Privacy Policy Text", height=200, placeholder="Paste the privacy policy text here...")
         
-        if text_content:
-            st.success(f"✅ Text ready for analysis! ({len(text_content.split())} words)")
+        if text_input:
+            st.session_state.text_content = text_input
+            st.session_state.text_source = "Manual Input"
+            st.success(f"✅ Text ready for analysis! ({len(text_input.split())} words)")
+    
+    # Clear content button
+    if st.session_state.text_content:
+        if st.button("🗑️ Clear Content"):
+            st.session_state.text_content = None
+            st.session_state.text_source = None
+            st.rerun()
+    
+    # Show current content status
+    if st.session_state.text_content:
+        st.info(f"📄 Content loaded from: {st.session_state.text_source} ({len(st.session_state.text_content.split())} words)")
     
     # Analysis section
-    if text_content and len(text_content.strip()) > 50:
+    if st.session_state.text_content and len(st.session_state.text_content.strip()) > 50:
         st.markdown("---")
         
         if st.button("🔍 Analyze Privacy Policy", type="primary"):
@@ -1013,7 +1034,7 @@ def main():
                 
                 # Classification
                 st.subheader("📋 Quick Summary")
-                summary = summarize_text(text_content, model_package)
+                summary = summarize_text(st.session_state.text_content, model_package)
                 st.markdown(f"""
                 <div class="card">
                     <h4>📝 Policy Summary</h4>
@@ -1022,14 +1043,14 @@ def main():
                 """, unsafe_allow_html=True)
                 
                 # Classification results
-                classification_results = classify_privacy_policy(text_content, model_package)
+                classification_results = classify_privacy_policy(st.session_state.text_content, model_package)
                 
                 if classification_results:
                     display_classification_results(classification_results)
                     
                     # Vague language analysis
                     st.markdown("---")
-                    vague_indicators = analyze_vague_language(text_content)
+                    vague_indicators = analyze_vague_language(st.session_state.text_content)
                     display_vague_language_analysis(vague_indicators)
                     
                     # Key recommendations
@@ -1062,7 +1083,7 @@ def main():
                 else:
                     st.error("❌ Classification failed. Please check the model and try again.")
     
-    elif text_content and len(text_content.strip()) <= 50:
+    elif st.session_state.text_content and len(st.session_state.text_content.strip()) <= 50:
         st.warning("⚠️ Please provide more text for analysis (at least 50 characters)")
     
     # Footer
