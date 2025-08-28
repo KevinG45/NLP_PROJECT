@@ -24,3 +24,7 @@ seaborn>=0.11.0
 matplotlib>=3.5.0
 gensim>=4.2.0
 psutil>=5.8.0
+
+# AI Assistant dependencies
+openai>=1.0.0
+python-dotenv>=1.0.0

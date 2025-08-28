@@ -30,6 +30,13 @@ except ImportError:
     st.error("NLP Concepts module not found. Please ensure nlp_concepts.py is in the same directory.")
     NLPAnalyzer = None
 
+# Import the Privacy Assistant
+try:
+    from privacy_assistant import PrivacyAssistant
+except ImportError:
+    st.error("Privacy Assistant module not found. Please ensure privacy_assistant.py is in the same directory.")
+    PrivacyAssistant = None
+
 # Import the SimpleSummarizer class from train_model
 try:
     from train_model import SimpleSummarizer
@@ -1614,6 +1621,114 @@ def display_stats_for_nerds():
         elif inspection_type == "Keywords":
             st.json([{'keyword': word, 'score': score} for word, score in keywords_perf])
 
+def display_privacy_assistant(policy_text, analysis_results):
+    """Display the AI-powered privacy assistant interface"""
+    st.markdown("---")
+    st.subheader("🤖 AI Privacy Assistant")
+    
+    # Initialize assistant
+    assistant = PrivacyAssistant()
+    
+    if not assistant.is_available():
+        st.warning("""
+        🔑 **AI Assistant Setup Required**
+        
+        The AI assistant requires an OpenAI API key to function. To enable this feature:
+        
+        1. Get an API key from [OpenAI Platform](https://platform.openai.com/api-keys)
+        2. Copy `.env.example` to `.env` 
+        3. Add your API key to the `.env` file
+        4. Restart the application
+        
+        The AI assistant helps answer questions about privacy policies in plain language!
+        """)
+        return
+    
+    # Create context for the assistant
+    context = assistant.analyze_policy_with_context(policy_text, analysis_results)
+    
+    # Risk assessment
+    st.markdown("#### 🚨 Privacy Risk Assessment")
+    risk_assessment = assistant.explain_privacy_risks(analysis_results)
+    st.markdown(f"""
+    <div class="card">
+        <pre style="white-space: pre-wrap; font-family: inherit;">{risk_assessment}</pre>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Suggested questions
+    st.markdown("#### 💭 Suggested Questions")
+    suggested_questions = assistant.get_suggested_questions(analysis_results)
+    
+    # Create columns for suggested questions
+    cols = st.columns(2)
+    for i, question in enumerate(suggested_questions):
+        col = cols[i % 2]
+        if col.button(f"❓ {question}", key=f"suggestion_{i}"):
+            # Auto-fill the question in the text input
+            st.session_state.ai_question = question
+    
+    # Question input
+    st.markdown("#### 💬 Ask the AI Assistant")
+    
+    # Initialize question state
+    if 'ai_question' not in st.session_state:
+        st.session_state.ai_question = ""
+    
+    question = st.text_input(
+        "Ask a question about this privacy policy:",
+        value=st.session_state.ai_question,
+        placeholder="e.g., What personal data does this app collect?",
+        key="question_input"
+    )
+    
+    col1, col2, col3 = st.columns([2, 1, 1])
+    
+    with col1:
+        if st.button("🚀 Ask Assistant", type="primary", disabled=not question.strip()):
+            if question.strip():
+                with st.spinner("🤔 AI is thinking..."):
+                    response = assistant.ask_question(question, context)
+                
+                st.markdown("#### 🤖 Assistant Response")
+                st.markdown(f"""
+                <div class="card">
+                    <h5>❓ Question:</h5>
+                    <p><em>{question}</em></p>
+                    <h5>💡 Answer:</h5>
+                    <p>{response}</p>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Clear the question
+                st.session_state.ai_question = ""
+    
+    with col2:
+        if st.button("🧹 Clear Question"):
+            st.session_state.ai_question = ""
+            st.rerun()
+    
+    with col3:
+        if st.button("🔄 Clear History"):
+            assistant.clear_conversation_history()
+            st.success("Chat history cleared!")
+    
+    # Conversation history
+    history = assistant.get_conversation_history()
+    if history:
+        st.markdown("#### 📝 Recent Conversation")
+        
+        # Show only last 3 exchanges
+        recent_history = history[-3:] if len(history) > 3 else history
+        
+        for i, exchange in enumerate(reversed(recent_history)):
+            with st.expander(f"Exchange {len(recent_history) - i}: {exchange['question'][:50]}..."):
+                st.markdown(f"""
+                **Question:** {exchange['question']}
+                
+                **Response:** {exchange['response']}
+                """)
+
 def main():
     """Main Streamlit application"""
     
@@ -1775,6 +1890,10 @@ def main():
                             <p>{rec}</p>
                         </div>
                         """, unsafe_allow_html=True)
+                    
+                    # AI Privacy Assistant Section
+                    if PrivacyAssistant:
+                        display_privacy_assistant(st.session_state.text_content, classification_results)
                 else:
                     st.error("❌ Classification failed. Please check the model and try again.")
     

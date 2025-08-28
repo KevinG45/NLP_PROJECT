@@ -2,7 +2,27 @@
 
 An AI-powered NLP system for analyzing privacy policies and terms of service documents. This tool helps users understand what data is collected, how it's stored, whether it's shared with third parties, and identifies potentially vague or ambiguous language.
 
-## Features
+## ✨ New Features
+
+### 🤖 AI-Powered Conversational Assistant
+
+The latest version includes an intelligent chatbot that can answer questions about privacy policies in plain English!
+
+- **🎯 Context-Aware Responses**: Uses existing privacy analysis results to provide accurate answers
+- **💬 Natural Language Queries**: Ask questions like "What data do they collect?" or "Can I delete my information?"
+- **🚨 Risk Assessment**: Automatic privacy risk evaluation with clear explanations
+- **💭 Smart Suggestions**: Dynamic question suggestions based on policy analysis
+- **📝 Conversation Memory**: Maintains context across multiple questions
+
+#### Quick Setup for AI Assistant
+
+1. Get an OpenAI API key from [platform.openai.com](https://platform.openai.com/api-keys)
+2. Copy `.env.example` to `.env` and add your API key
+3. Restart the application
+
+See [`AI_ASSISTANT_README.md`](AI_ASSISTANT_README.md) for detailed setup instructions.
+
+## Core Features
 
 - **📊 Data Collection Analysis**: Identifies what personal information is being collected
 - **🤝 Data Sharing Detection**: Detects if data is shared with third parties
